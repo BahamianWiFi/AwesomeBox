@@ -1,6 +1,7 @@
-pragma solidity ^0.5.0;
+pragma solidity ^0.4.24;
 
 import './ERC721.sol';
+import './SafeMath.sol';
 
 contract CryptoBallers is ERC721 {
 
@@ -15,10 +16,14 @@ contract CryptoBallers is ERC721 {
 
     address owner;
     Baller[] public ballers;
+    uint256 seed;
     
 
     // Mapping for if address has claimed their free baller
     mapping(address => bool) claimedFreeBaller;
+    
+    //Mapping to keep track of baller exp to level up
+    mapping(uint256 => uint256) exp;
 
     // Fee for buying a baller
     uint ballerFee = 0.10 ether;
@@ -83,8 +88,24 @@ contract CryptoBallers is ERC721 {
     * @param _opponentId uint ID that the baller needs to be above
     */
     function playBall(uint _ballerId, uint _opponentId) onlyOwnerOf(_ballerId) public {
-        require ();
-       // TODO add your code
+        require (msg.sender == ownerOf(_ballerId) || msg.sender == ownerOf(_opponentId));
+        uint256 prob = pRNG(ballers[_ballerId].level, ballers[_opponentId].level);
+        if (prob % 2 == 0){
+            ballers[_ballerId].offenseSkill += 1; //Update Winner Offense
+            ballers[_ballerId].winCount += 1;     //Update Winner Wins
+            ballers[_opponentId].defenseSkill -= 1; //Update Loser Defense
+            ballers[_opponentId].lossCount += 1; //Update Loser Losses 
+            exp[_ballerId] += 1; //Winner gains 1 exp
+        }
+        
+        else{
+            ballers[_ballerId].defenseSkill -= 1; //Update Loser Defense
+            ballers[_opponentId].offenseSkill += 1; //Update Winner Offense
+            ballers[_opponentId].winCount += 1;  //Update Winner Wins
+            ballers[_ballerId].lossCount += 1; //Update Loser Losses 
+            exp[_opponentId] += 1; //Winner gains 1 exp
+        }
+        
     }
 
     /**
@@ -92,7 +113,7 @@ contract CryptoBallers is ERC721 {
     * @param _ballerId uint ID of the Baller who's name you want to change
     * @param _newName string new name you want to give to your Baller
     */
-    function changeName(uint _ballerId, string calldata _newName) external aboveLevel(2, _ballerId) onlyOwnerOf(_ballerId) {
+    function changeName(uint _ballerId, string _newName) external aboveLevel(2, _ballerId) onlyOwnerOf(_ballerId) {
         ballers[_ballerId].name = _newName;
     }
 
@@ -129,4 +150,23 @@ contract CryptoBallers is ERC721 {
         return (level, attack, defense);
 
     }
+    
+   function pRNG(uint256 _baller1Lvl, uint256 _baller2Lvl) internal returns (uint256) {
+       //Linear Congruential Random Number Generator
+       //Coming Soon: Weighted Probability based on each ballers attributes
+       uint256 aux1 = (seed.mul(1664525));
+       uint256 num = 1013904223;
+       uint256 aux2 = num.add(aux1);
+       uint256 rand = aux2%2**32;
+       seed = rand;
+       return rand;
+   }
+   
+   function levelUp(uint256 _id) public{
+       require(msg.sender == ownerOf(_id), "Owner of Baller Only!");
+       require( exp[_id] >= 3, "You need more experience!");
+       exp[_id] = exp[_id].sub(3); //Update Exp
+       ballers[_id].level += 1; //Levels up baller
+   }
+    
 }
